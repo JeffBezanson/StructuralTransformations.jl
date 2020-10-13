@@ -102,10 +102,6 @@ function matching(edges, nvars, active=trues(nvars))
     return assign
 end
 
-# Needed to make dict work. TODO: move this to mtk
-Base.hash(x::Operation, salt::UInt64) = Base.hash(x.args, Base.hash(x.op, salt))
-Base.hash(D::Differential, salt::UInt64) = Base.hash(D.x, salt+1)
-
 # Naive subtree matching, we can make the dict have levels
 # Going forward we should look into storing the depth in Operations
 function walk_and_substitute(expr, substitution_dict)
