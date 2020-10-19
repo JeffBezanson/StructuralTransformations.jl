@@ -1,22 +1,22 @@
 module StructuralTransformations
 
 using ModelingToolkit
-using ModelingToolkit: ODESystem, var_from_nested_derivative, Differential, Operation, states, equations, Constant, vars
+using ModelingToolkit: ODESystem, var_from_nested_derivative, Differential, states, equations, vars, Symbolic, symtype
 
-function lower_varname_dae(var::Variable, idv, order)
+function lower_varname_dae(var::Term, idv, order)
     order == 0 && return var
-    name = Symbol(var.name, :ˍˍ, string(idv.name)^order)
-    return Variable{ModelingToolkit.vartype(var)}(name)
+    name = Symbol(nameof(var.op), :ˍˍ, string(idv)^order)
+    return Sym{symtype(var.op)}(name)(var.args[1])
 end
 
 # V-nodes `[x_1, x_2, x_3, ..., dx_1, dx_2, ..., y_1, y_2, ...]` where `x`s are
 # differential variables and `y`s are algebraic variables.
 function get_vnodes(sys)
-    dxvars = Operation[]
+    dxvars = []
     eqs = equations(sys)
     edges = map(_->Int[], 1:length(eqs))
     for (i, eq) in enumerate(eqs)
-        if !(eq.lhs isa Constant)
+        if eq.lhs isa Symbolic
             # Make sure that the LHS is a first order derivative of a var.
             @assert eq.lhs.op isa Differential
             @assert !(eq.lhs.args[1] isa Differential) # first order
@@ -29,8 +29,6 @@ function get_vnodes(sys)
 
     xvars = (first ∘ var_from_nested_derivative).(dxvars)
     algvars  = setdiff(states(sys), xvars)
-    xvars = map(x->x(sys.iv()), xvars)
-    algvars = map(x->x(sys.iv()), algvars)
     return xvars, dxvars, edges, algvars
 end
 
@@ -49,19 +47,19 @@ function sys2bigraph(sys)
         vs = vars(eq.rhs)
         for v in vs
             for (j, target_v) in enumerate(xvars)
-                if v == target_v.op
+                if isequal(v, target_v)
                     push!(edges[i], j)
                 end
             end
             for (j, target_v) in enumerate(algvars)
-                if v == target_v.op
+                if isequal(v, target_v)
                     push!(edges[i], j+algvar_offset)
                 end
             end
         end
     end
 
-    fullvars = Operation[xvars; dxvars; algvars] # full list of variables
+    fullvars = [xvars; dxvars; algvars] # full list of variables
     vars_asso = Int[(1:xvar_offset) .+ xvar_offset; zeros(Int, length(fullvars) - xvar_offset)] # variable association list
     return edges, fullvars, vars_asso
 end
@@ -103,12 +101,12 @@ function matching(edges, nvars, active=trues(nvars))
 end
 
 # Naive subtree matching, we can make the dict have levels
-# Going forward we should look into storing the depth in Operations
+# Going forward we should look into storing the depth in Terms
 function walk_and_substitute(expr, substitution_dict)
     if haskey(substitution_dict, expr)
         return substitution_dict[expr]
-    elseif expr isa Operation
-        return Operation(walk_and_substitute(expr.op, substitution_dict),
+    elseif expr isa Term
+        return Term(walk_and_substitute(expr.op, substitution_dict),
                          map(x->walk_and_substitute(x, substitution_dict), expr.args))
     elseif expr isa Equation
         error("TODO: can rhs contain equations?")
@@ -125,7 +123,7 @@ function pantelides_reassemble(sys, vars, vars_asso, eqs_asso, assign)
     out_eqs[1:length(in_eqs)] .= in_eqs
 
     d_dict = Dict(zip(vars, 1:length(vars)))
-    D = ModelingToolkit.Differential(sys.iv())
+    D = ModelingToolkit.Differential(sys.iv)
     for (i, e) in enumerate(eqs_asso)
         if e === 0
             continue
@@ -133,9 +131,9 @@ function pantelides_reassemble(sys, vars, vars_asso, eqs_asso, assign)
         # LHS variable is looked up from vars_asso
         # the vars_asso[i]-th variable is the differentiated version of var at i
         eq = out_eqs[i]
-        lhs = if eq.lhs isa Constant
+        lhs = if !(eq.lhs isa Symbolic)
             0
-        elseif eq.lhs isa Operation && eq.lhs.op isa Differential
+        elseif eq.lhs isa Term && eq.lhs.op isa Differential
             # look up the variable that represents D(lhs)
             @assert !(eq.lhs.args[1] isa Differential) # first order
             i = get(d_dict, eq.lhs.args[1], nothing)
@@ -149,13 +147,13 @@ function pantelides_reassemble(sys, vars, vars_asso, eqs_asso, assign)
         end
         rhs = ModelingToolkit.expand_derivatives(D(eq.rhs))
         out_eqs[e] = lhs ~ rhs
-        substitution_dict = Dict(x.lhs => x.rhs for x in out_eqs if x !== nothing && !(x.lhs isa Constant))
+        substitution_dict = Dict(x.lhs => x.rhs for x in out_eqs if x !== nothing && x.lhs isa Symbolic)
         sub_rhs = walk_and_substitute(rhs, substitution_dict)
         out_eqs[e] = lhs ~ sub_rhs
     end
     @assert !any(x->x === nothing, out_eqs)
 
-    final_vars = map(x->x.op, filter(x->!(x.op isa Differential), vars))
+    final_vars = filter(x->!(x.op isa Differential), vars)
     final_eqs = map(identity, out_eqs[sort(filter(!iszero, assign))])
 
     # remove clashing equations (from order lowering vs index reduction)
@@ -167,19 +165,19 @@ function pantelides(sys::ODESystem; kwargs...)
     return pantelides!(edges, fullvars, vars_asso, sys.iv; kwargs...)
 end
 
-function pantelides!(edges, vars, vars_asso, iv; maxiter = 8000)
+function pantelides!(edges, vars, vars_asso, iv; maxiter = 8)
     neqs = length(edges)
     nvars = length(vars)
     assign = zeros(Int, nvars)
     eqs_asso = fill(0, neqs)
     neqs′ = neqs
-    D = Differential(iv())
+    D = Differential(iv)
     for k in 1:neqs′
         i = k
         pathfound = false
         # In practice, `maxiter=8000` should never be reached, otherwise, the
         # index would be on the order of thousands.
-        for _ in 1:maxiter
+        for iii in 1:maxiter
             # run matching on (dx, y) variables
             #
             # the derivatives and algebraic variables are zeros in the variable
@@ -197,7 +195,7 @@ function pantelides!(edges, vars, vars_asso, iv; maxiter = 8000)
                 lhsj = vars[j]
                 vj, order = var_from_nested_derivative(lhsj)
                 _newvarj = lower_varname_dae(vj, iv, order)
-                newvarj = _newvarj(iv())
+                newvarj = _newvarj
                 vars[j] = newvarj
                 vars_asso[j] = nvars
                 # introduce a derivative variable (dx)
@@ -236,7 +234,6 @@ end
 function dae_index_lowering(sys::ODESystem; kwargs...)
     edges, fullvars, vars_asso = sys2bigraph(sys)
     edges, assign, vars_asso, eqs_asso, vars = pantelides!(edges, fullvars, vars_asso, sys.iv; kwargs...)
-    #@show edges, assign, vars_asso, eqs_asso, vars
     return pantelides_reassemble(sys, vars, vars_asso, eqs_asso, assign)
 end
 
