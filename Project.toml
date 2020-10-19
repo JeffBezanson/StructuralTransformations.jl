@@ -1,6 +1,6 @@
 name = "StructuralTransformations"
 uuid = "4f93e3cf-3b49-4120-aa20-3ba94fef1cc3"
-authors = ["Chris Rackauckas <accounts@chrisrackauckas.com>"]
+authors = ["Yingbo Ma <mayingbo5@gmail.com>", "Shashi Gowda <gowda@mit.edu>", "Chris Rackauckas <accounts@chrisrackauckas.com>"]
 version = "0.1.0"
 
 [deps]
