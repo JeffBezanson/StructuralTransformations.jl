@@ -50,7 +50,7 @@ p = [
 
 prob_auto = ODEProblem(new_sys,u0,(0.0,100.0),p)
 sol = solve(prob_auto, Rodas5());
-plot(sol, vars=(3, 4))
+plot(sol, vars=(x, y))
 ```
 
 ## Methods
