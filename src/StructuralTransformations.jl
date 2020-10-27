@@ -162,7 +162,7 @@ function pantelides(sys::ODESystem; kwargs...)
     return pantelides!(edges, fullvars, vars_asso, sys.iv; kwargs...)
 end
 
-function pantelides!(edges, vars, vars_asso, iv; maxiter = 8)
+function pantelides!(edges, vars, vars_asso, iv; maxiters = 8000)
     neqs = length(edges)
     nvars = length(vars)
     assign = zeros(Int, nvars)
@@ -172,9 +172,9 @@ function pantelides!(edges, vars, vars_asso, iv; maxiter = 8)
     for k in 1:neqs′
         i = k
         pathfound = false
-        # In practice, `maxiter=8000` should never be reached, otherwise, the
+        # In practice, `maxiters=8000` should never be reached, otherwise, the
         # index would be on the order of thousands.
-        for iii in 1:maxiter
+        for iii in 1:maxiters
             # run matching on (dx, y) variables
             #
             # the derivatives and algebraic variables are zeros in the variable
@@ -222,8 +222,8 @@ function pantelides!(edges, vars, vars_asso, iv; maxiter = 8)
                 assign[vars_asso[j]] = eqs_asso[assign[j]]
             end
             i = eqs_asso[i]
-        end # for _ in 1:maxiter
-        pathfound || error("maxiter=$maxiter reached! File a bug report if your system has a reasonable index (<100), and you are using the default `maxiter`. Try to increase the maxiter by `pantelides(sys::ODESystem; maxiter=1_000_000)` if your system has an incredibly high index and it is truly extremely large.")
+        end # for _ in 1:maxiters
+        pathfound || error("maxiters=$maxiters reached! File a bug report if your system has a reasonable index (<100), and you are using the default `maxiters`. Try to increase the maxiters by `pantelides(sys::ODESystem; maxiters=1_000_000)` if your system has an incredibly high index and it is truly extremely large.")
     end # for k in 1:neqs′
     return edges, assign, vars_asso, eqs_asso, vars
 end
