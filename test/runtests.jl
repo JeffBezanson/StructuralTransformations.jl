@@ -49,7 +49,7 @@ edges, assign, vars_asso, eqs_asso, vars = StructuralTransformations.pantelides(
 #                  [1, 2, 3, 4,   5,   6,  7,  8, 9,   10,   11]
 #                  [x, y, w, z, xˍt, yˍt, w', z', T, xˍt', yˍt']
 @test vars_asso  == [5, 6, 7, 8,  10,  11,    0,    0, 0,      0,      0]
-@test isequal(vars, [x, y, w, z, xˍˍt, yˍˍt, D(w), D(z), T, D(xˍˍt), D(yˍˍt)])
+@test isequal(vars, [x, y, w, z, xˍt, yˍt, D(w), D(z), T, D(xˍt), D(yˍt)])
 #1: D(x) ~ w
 #2: D(y) ~ z
 #3: D(w) ~ T*x
@@ -99,10 +99,43 @@ sol = solve(prob, Rodas5());
 new_sys = StructuralTransformations.dae_index_lowering(ModelingToolkit.ode_order_lowering(pendulum2))
 
 prob_auto = ODEProblem(ODEFunction(new_sys),
-        #  [xˍt, yˍt, x, y, xˍˍt, yˍˍt, T]
-           [0,     0, 1, 0,    0,    0, 0.0],# 0, 0, 0, 0],
+        #  [xˍt, yˍt, x, y,   T]
+           [0,     0, 1, 0, 0.0],# 0, 0, 0, 0],
            (0, 100.0),
            [1, 9.8],
            mass_matrix=calculate_massmatrix(new_sys))
 sol = solve(prob_auto, Rodas5());
 #plot(sol, vars=(3, 4))
+
+# Define some variables
+@parameters t L g
+@variables x(t) y(t) T(t)
+@derivatives D'~t
+
+eqs2 = [D(D(x)) ~ T*x,
+        D(D(y)) ~ T*y - g,
+        0 ~ x^2 + y^2 - L^2]
+pendulum2 = ODESystem(eqs2, t, [x, y, T], [L, g], name=:pendulum)
+
+# Turn into a first order differential equation system
+first_order_sys = ModelingToolkit.ode_order_lowering(pendulum2)
+
+# Perform index reduction to get an Index 1 DAE
+new_sys = StructuralTransformations.dae_index_lowering(first_order_sys)
+
+u0 = [
+  D(x)    => 0.0,
+  D(y)    => 0.0,
+  x       => 1.0,
+  y       => 0.0,
+  T       => 0.0
+]
+
+p = [
+    L => 1.0,
+    g => 9.8
+]
+
+prob_auto = ODEProblem(new_sys,u0,(0.0,100.0),p)
+sol = solve(prob_auto, Rodas5());
+#plot(sol, vars=(D(x), y))
