@@ -1,13 +1,7 @@
 module StructuralTransformations
 
 using ModelingToolkit
-using ModelingToolkit: ODESystem, var_from_nested_derivative, Differential, states, equations, vars, Symbolic, symtype, arguments, operation, diff2term, lower_varname, value
-
-function lower_varname_dae(var::Term, idv, order)
-    order == 0 && return var
-    name = Symbol(nameof(var.op), :ˍˍ, string(idv)^order)
-    return Sym{symtype(var.op)}(name)(var.args[1])
-end
+using ModelingToolkit: ODESystem, var_from_nested_derivative, Differential, states, equations, vars, Symbolic, lower_varname, value
 
 # V-nodes `[x_1, x_2, x_3, ..., dx_1, dx_2, ..., y_1, y_2, ...]` where `x`s are
 # differential variables and `y`s are algebraic variables.

@@ -19,7 +19,7 @@ using Plots
 
 # Define some variables
 @parameters t L g
-@variables x(t) y(t) w(t) z(t) T(t)
+@variables x(t) y(t) T(t)
 @derivatives D'~t
 
 eqs2 = [D(D(x)) ~ T*x,
