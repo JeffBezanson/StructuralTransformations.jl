@@ -46,7 +46,7 @@ p = [
     g => 9.8
 ]
 
-prob_auto = ODEProblem(new_sys,u0,(0.0,100.0),p)
+prob_auto = ODEProblem(new_sys,u0,(0.0,10.0),p)
 sol = solve(prob_auto, Rodas5());
 plot(sol, vars=(D(x), y))
 ```
