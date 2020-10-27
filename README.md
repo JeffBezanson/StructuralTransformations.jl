@@ -28,7 +28,7 @@ eqs = [D(D(x)) ~ T*x,
 pendulum = ODESystem(eqs, t, [x, y, T], [L, g], name=:pendulum)
 
 # Turn into a first order differential equation system
-first_order_sys = ModelingToolkit.ode_order_lowering(pendulum2)
+first_order_sys = ModelingToolkit.ode_order_lowering(pendulum)
 
 # Perform index reduction to get an Index 1 DAE
 new_sys = StructuralTransformations.dae_index_lowering(first_order_sys)
