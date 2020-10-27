@@ -19,7 +19,7 @@ using Plots
 
 # Define some variables
 @parameters t L g
-@variables x(t) y(t) w(t) z(t) T(t) xˍt(t) yˍt(t) xˍˍt(t) yˍˍt(t)
+@variables x(t) y(t) w(t) z(t) T(t)
 @derivatives D'~t
 
 eqs2 = [D(D(x)) ~ T*x,
@@ -38,8 +38,6 @@ u0 = [
   D(y)    => 0.0,
   x       => 1.0,
   y       => 0.0,
-  xˍˍt    => 0.0,
-  yˍˍt    => 0.0,
   T       => 0.0
 ]
 
@@ -50,7 +48,7 @@ p = [
 
 prob_auto = ODEProblem(new_sys,u0,(0.0,100.0),p)
 sol = solve(prob_auto, Rodas5());
-plot(sol, vars=(x, y))
+plot(sol, vars=(D(x), y))
 ```
 
 ## Methods
