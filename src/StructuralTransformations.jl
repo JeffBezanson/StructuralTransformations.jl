@@ -1,7 +1,7 @@
 module StructuralTransformations
 
 using ModelingToolkit
-using ModelingToolkit: ODESystem, var_from_nested_derivative, Differential, states, equations, vars, Symbolic, symtype
+using ModelingToolkit: ODESystem, var_from_nested_derivative, Differential, states, equations, vars, Symbolic, symtype, arguments, operation, diff2term, lower_varname, value
 
 function lower_varname_dae(var::Term, idv, order)
     order == 0 && return var
@@ -124,6 +124,7 @@ function pantelides_reassemble(sys, vars, vars_asso, eqs_asso, assign)
 
     d_dict = Dict(zip(vars, 1:length(vars)))
     D = ModelingToolkit.Differential(sys.iv)
+    lhss = Set{Any}([x.lhs for x in in_eqs if x.lhs isa Term && x.lhs.op isa Differential])
     for (i, e) in enumerate(eqs_asso)
         if e === 0
             continue
@@ -138,7 +139,11 @@ function pantelides_reassemble(sys, vars, vars_asso, eqs_asso, assign)
             @assert !(eq.lhs.args[1] isa Differential) # first order
             i = get(d_dict, eq.lhs.args[1], nothing)
             if i !== nothing
-                D(vars[vars_asso[i]])
+                lhs = D(vars[vars_asso[i]])
+                if lhs in lhss
+                    lhs = Num(nothing)
+                end
+                lhs
             else
                 D(eq.lhs)
             end
@@ -146,15 +151,13 @@ function pantelides_reassemble(sys, vars, vars_asso, eqs_asso, assign)
             D(eq.lhs)
         end
         rhs = ModelingToolkit.expand_derivatives(D(eq.rhs))
-        out_eqs[e] = lhs ~ rhs
         substitution_dict = Dict(x.lhs => x.rhs for x in out_eqs if x !== nothing && x.lhs isa Symbolic)
         sub_rhs = walk_and_substitute(rhs, substitution_dict)
         out_eqs[e] = lhs ~ sub_rhs
     end
-    @assert !any(x->x === nothing, out_eqs)
 
-    final_vars = filter(x->!(x.op isa Differential), vars)
-    final_eqs = map(identity, out_eqs[sort(filter(!iszero, assign))])
+    final_vars = unique(filter(x->!(x.op isa Differential), vars))
+    final_eqs = map(identity, filter(x->value(x.lhs) !== nothing, out_eqs[sort(filter(!iszero, assign))]))
 
     # remove clashing equations (from order lowering vs index reduction)
     return ODESystem(final_eqs, sys.iv, final_vars, sys.ps)
@@ -194,7 +197,7 @@ function pantelides!(edges, vars, vars_asso, iv; maxiter = 8)
                 # introduce a differential variable (x)
                 lhsj = vars[j]
                 vj, order = var_from_nested_derivative(lhsj)
-                _newvarj = lower_varname_dae(vj, iv, order)
+                _newvarj = lower_varname(vj, iv, order)
                 newvarj = _newvarj
                 vars[j] = newvarj
                 vars_asso[j] = nvars

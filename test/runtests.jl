@@ -49,7 +49,7 @@ edges, assign, vars_asso, eqs_asso, vars = StructuralTransformations.pantelides(
 #                  [1, 2, 3, 4,   5,   6,  7,  8, 9,   10,   11]
 #                  [x, y, w, z, xˍt, yˍt, w', z', T, xˍt', yˍt']
 @test vars_asso  == [5, 6, 7, 8,  10,  11,    0,    0, 0,      0,      0]
-@test isequal(vars, [x, y, w, z, xˍˍt, yˍˍt, D(w), D(z), T, D(xˍˍt), D(yˍˍt)])
+@test isequal(vars, map(ModelingToolkit.value, [x, y, w, z, xˍt, yˍt, D(w), D(z), T, D(xˍt), D(yˍt)]))
 #1: D(x) ~ w
 #2: D(y) ~ z
 #3: D(w) ~ T*x
@@ -99,8 +99,8 @@ sol = solve(prob, Rodas5());
 new_sys = StructuralTransformations.dae_index_lowering(ModelingToolkit.ode_order_lowering(pendulum2))
 
 prob_auto = ODEProblem(ODEFunction(new_sys),
-        #  [xˍt, yˍt, x, y, xˍˍt, yˍˍt, T]
-           [0,     0, 1, 0,    0,    0, 0.0],# 0, 0, 0, 0],
+        #  [xˍt, yˍt, x, y,   T]
+           [0,     0, 1, 0, 0.0],# 0, 0, 0, 0],
            (0, 100.0),
            [1, 9.8],
            mass_matrix=calculate_massmatrix(new_sys))
