@@ -22,10 +22,10 @@ using Plots
 @variables x(t) y(t) T(t)
 @derivatives D'~t
 
-eqs2 = [D(D(x)) ~ T*x,
-        D(D(y)) ~ T*y - g,
-        0 ~ x^2 + y^2 - L^2]
-pendulum2 = ODESystem(eqs2, t, [x, y, T], [L, g], name=:pendulum)
+eqs = [D(D(x)) ~ T*x,
+       D(D(y)) ~ T*y - g,
+       0 ~ x^2 + y^2 - L^2]
+pendulum = ODESystem(eqs, t, [x, y, T], [L, g], name=:pendulum)
 
 # Turn into a first order differential equation system
 first_order_sys = ModelingToolkit.ode_order_lowering(pendulum2)
